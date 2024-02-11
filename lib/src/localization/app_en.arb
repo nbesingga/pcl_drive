@@ -1,0 +1,6 @@
+{
+  "appTitle": "pcl",
+  "@appTitle": {
+    "description": "The title of the application"
+  }
+}
