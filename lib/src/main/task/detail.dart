@@ -35,6 +35,8 @@ class _BookingDetailState extends State<BookingDetailPage> {
     final String task = widget.item['task'] ?? '';
     final String customer = widget.item['customer'] ?? '';
     final String remarks = widget.item['remarks'] ?? '';
+    final String pickupRemarks = widget.item['pup_remarks'] ?? '';
+    final String deliveryRemarks = widget.item['dlv_remarks'] ?? '';
     final String pickupName = widget.item['pup_name'] ?? '';
     final String deliveryName = widget.item['dlv_name'] ?? '';
     final totalCbm = widget.item['cbm'] ?? '';
@@ -50,7 +52,15 @@ class _BookingDetailState extends State<BookingDetailPage> {
     DateTime estDlv = DateTime.parse(widget.item['dlv_expected_date'] ?? '');
     final deliverDtime = DateFormat('MMM d,yyyy h:mm a').format(estDlv);
     return Scaffold(
-      appBar: AppBar(title: const Text('Booking Details')),
+      appBar: AppBar(
+        title: const Text('Booking Details'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+        ),
+      ),
       body: SingleChildScrollView(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
@@ -109,7 +119,7 @@ class _BookingDetailState extends State<BookingDetailPage> {
                   // trailing: Text('May 1, 2023'),
                 ),
                 ListTile(
-                    leading: SvgPicture.asset('icons/home_pin.svg', width: 35.0, height: 35.0, color: Colors.black),
+                    leading: SvgPicture.asset('assets/icons/home_pin.svg', width: 35.0, height: 35.0, color: Colors.black),
                     title: const Text(
                       'PICK UP',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -127,9 +137,13 @@ class _BookingDetailState extends State<BookingDetailPage> {
                         pickupAddress,
                         style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                       ),
+                      Text(
+                        pickupRemarks,
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                      )
                     ])),
                 ListTile(
-                    leading: SvgPicture.asset('icons/home_location.svg', width: 35.0, height: 35.0, color: Colors.black),
+                    leading: SvgPicture.asset('assets/icons/home_location.svg', width: 35.0, height: 35.0, color: Colors.black),
                     title: const Text(
                       'DELIVERY',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -146,10 +160,14 @@ class _BookingDetailState extends State<BookingDetailPage> {
                       Text(
                         deliveryAddress,
                         style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        deliveryRemarks,
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                       )
                     ])),
                 ListTile(
-                    leading: SvgPicture.asset('icons/package.svg', width: 35.0, height: 35.0, color: Colors.black),
+                    leading: SvgPicture.asset('assets/icons/package.svg', width: 35.0, height: 35.0, color: Colors.black),
                     title: const Text(
                       'ITEM DETAILS',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),

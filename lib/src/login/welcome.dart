@@ -6,11 +6,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// import 'package:pcl/src/helper/db_helper.dart';
 import 'package:pcl/src/main/main_screen.dart';
 import 'package:pcl/src/api/api.dart';
 import 'package:pcl/src/platelist.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 class WelcomePage extends StatefulWidget {
   const WelcomePage({Key? key}) : super(key: key);
@@ -55,8 +56,8 @@ class _WelcomePageState extends State<WelcomePage> {
 
   @override
   void initState() {
-    super.initState();
     user_info();
+    super.initState();
   }
 
   void _clearPlate() {
@@ -85,8 +86,7 @@ class _WelcomePageState extends State<WelcomePage> {
       List<PlateList> filteredPlate = list.where((x) => x.plateNo.toString().toLowerCase().contains(query.toLowerCase())).toList();
       return filteredPlate;
     } else {
-      print("err");
-      throw Exception('Failed to load plate no');
+      return throw Exception('Failed to load plate no');
     }
   }
 
@@ -95,15 +95,11 @@ class _WelcomePageState extends State<WelcomePage> {
     return Scaffold(
         resizeToAvoidBottomInset: true,
         body: _isLoading
-            ? Center(
-                child: Lottie.asset(
-                  "animations/loading.json",
-                  animate: true,
-                  alignment: Alignment.center,
-                  height: 100,
-                  width: 100,
-                ),
-              )
+            ? const Center(
+                child: SpinKitFadingCircle(
+                color: Colors.orange,
+                size: 50.0,
+              ))
             : SingleChildScrollView(
                 child: Container(
                     child: Form(
@@ -112,7 +108,7 @@ class _WelcomePageState extends State<WelcomePage> {
                   mainAxisAlignment: MainAxisAlignment.start,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 80),
+                    const SizedBox(height: 100),
                     Text(
                       "${driver['trucker_name']?.toUpperCase()}! \n",
                       textAlign: TextAlign.center,
@@ -128,7 +124,7 @@ class _WelcomePageState extends State<WelcomePage> {
                     ),
                     const SizedBox(height: 30),
                     Lottie.asset(
-                      "animations/driver.json",
+                      "assets/animations/driver.json",
                       animate: true,
                       alignment: Alignment.center,
                       height: 150,
@@ -201,6 +197,8 @@ class _WelcomePageState extends State<WelcomePage> {
                                 user['helper_name'] = helper.text.toString();
                                 user['plate_no'] = plate.text.toString();
                                 prefs.setString('user', json.encode(user));
+                                var externalId = plate.text.toString();
+                                OneSignal.login(externalId);
                                 Navigator.push(context, MaterialPageRoute(builder: (context) => const MainScreen()));
                               } else {
                                 showDialog(

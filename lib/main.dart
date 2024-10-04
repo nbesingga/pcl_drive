@@ -5,9 +5,19 @@ import 'package:pcl/src/login/login.dart';
 import 'package:pcl/src/main/main_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 void main() async {
   await dotenv.load();
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+  try {
+    OneSignal.initialize(dotenv.env['ONE_SIGNAL_APP_ID'] ?? '');
+    OneSignal.Notifications.requestPermission(true);
+  } catch (e) {
+    print(e);
+  }
   runApp(const MyApp());
 }
 
@@ -39,7 +49,13 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    initialization();
     checkLoggedIn();
+  }
+
+  void initialization() async {
+    await Future.delayed(const Duration(seconds: 3));
+    FlutterNativeSplash.remove();
   }
 
   @override
