@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -7,12 +8,7 @@ class Api {
   final baseUrl = dotenv.env['BASE_URL'];
   postData(data, apiUrl) async {
     try {
-      var response = await http.post(Uri.parse('$baseUrl/$apiUrl'), body: jsonEncode(data), headers: _setHeaders());
-      if (response.statusCode == 200) {
-        return json.decode(response.body.toString());
-      } else {
-        return 'Request failed with status: ${response.statusCode}.';
-      }
+      return await http.post(Uri.parse('$baseUrl/$apiUrl'), body: jsonEncode(data), headers: _setHeaders());
     } catch (e) {
       return e;
     }
@@ -29,6 +25,7 @@ class Api {
         'Authorization': 'Bearer $bearerToken',
       };
       var url = (id != null && id > 0) ? '$baseUrl/$apiUrl/$id' : '$baseUrl/$apiUrl';
+      print(data);
       return await http.post(Uri.parse(url), body: jsonEncode(data), headers: head);
     } catch (e) {
       return e;

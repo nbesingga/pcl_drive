@@ -5,6 +5,8 @@ import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:timeline_tile/timeline_tile.dart';
+import 'package:pcl/src/api/api.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 
 class History extends StatefulWidget {
   final item;
@@ -15,27 +17,28 @@ class History extends StatefulWidget {
 
 class _HistoryState extends State<History> {
   List events = [];
+  Api api = Api();
   bool isLoading = false;
   Future<List<dynamic>> logs() async {
     setState(() {
       isLoading = true;
     });
-    final log = [];
-    // await dbHelper.getAll('booking_logs',
-    //     whereCondition: 'booking_id = ?',
-    //     whereArgs: [
-    //       widget.item['booking_id']
-    //     ],
-    //     orderBy: 'id DESC');
-    events = log;
-    setState(() {
-      isLoading = false;
+    final res = await api.getData('statusHistory', params: {
+      'booking_no': widget.item['booking_no'] ?? '',
+      'batch_no': widget.item['batch_no'] ?? '',
+      'group': 4,
     });
-    return events;
+    if (res.statusCode == 200) {
+      var data = jsonDecode(res.body);
+      return List<dynamic>.from(data['data']);
+    } else {
+      throw Exception('Failed to load logs');
+    }
   }
 
   @override
   void initState() {
+    logs();
     super.initState();
   }
 
@@ -71,88 +74,93 @@ class _HistoryState extends State<History> {
             ),
           ],
         ),
-        body: isLoading
-            ? const Center(child: CircularProgressIndicator(color: Colors.orange))
-            : FutureBuilder<List<dynamic>>(
-                future: logs(),
-                builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
-                  if (events.isNotEmpty) {
-                    return ListView.builder(
-                        itemCount: events.length,
-                        itemBuilder: (context, int index) {
-                          final history = events[index];
-                          // final signature = history['signature'] ?? '';
-                          int flag = history['flag'] ?? 0;
-                          return TimelineTile(
-                            alignment: TimelineAlign.manual,
-                            lineXY: 0.1,
-                            endChild: Container(
-                              constraints: const BoxConstraints(
-                                minHeight: 50,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  ListTile(
-                                    title: Text(
-                                      history['status_code'] ?? '',
+        body: FutureBuilder<List<dynamic>>(
+            future: logs(),
+            builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                    child: SpinKitFadingCircle(
+                  color: Colors.orange,
+                  size: 50.0,
+                ));
+              } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                return ListView.builder(
+                    itemCount: snapshot.data!.length,
+                    itemBuilder: (context, int index) {
+                      final history = snapshot.data![index];
+                      // final signature = history['signature'] ?? '';
+                      return TimelineTile(
+                        alignment: TimelineAlign.manual,
+                        lineXY: 0.1,
+                        endChild: Container(
+                          constraints: const BoxConstraints(
+                            minHeight: 50,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ListTile(
+                                title: Text(
+                                  history['status_code'] ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      history['status_desc'] ?? '',
                                       style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
                                       ),
                                     ),
-                                    subtitle: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          history['status_name'] ?? '',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                        Text(
-                                          history['status_date'] ?? '',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                        Text(
-                                          history['note'],
-                                          style: const TextStyle(fontSize: 12, overflow: TextOverflow.ellipsis),
-                                        ),
-                                        Text(
-                                          (history['task_code'] == 'TDD') ? 'Receive By : ${history['receive_by'] ?? ''}' : '',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                          ),
-                                        )
-                                      ],
+                                    Text(
+                                      history['status_date'] ?? '',
+                                      style: const TextStyle(fontSize: 12, color: Colors.red),
                                     ),
-                                  ),
-                                ],
+                                    Text(
+                                      history['remarks'] ?? '',
+                                      style: const TextStyle(fontSize: 12, overflow: TextOverflow.ellipsis),
+                                    ),
+                                    Text(
+                                      (history['status_code'] == 'TDD') ? 'Receive By : ${history['received_by'] ?? ''}' : '',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                      ),
+                                    )
+                                  ],
+                                ),
                               ),
-                              // ),
-                            ),
-                            isFirst: false,
-                            indicatorStyle: IndicatorStyle(
-                              width: 40,
-                              color: (flag == 1) ? Colors.green : Colors.blue,
-                              padding: const EdgeInsets.all(8),
-                              iconStyle: IconStyle(
-                                color: Colors.white,
-                                iconData: (flag == 1) ? Icons.check : Icons.sync,
-                              ),
-                            ),
-                            beforeLineStyle: const LineStyle(color: Colors.red, thickness: 3),
-                            afterLineStyle: const LineStyle(color: Colors.red, thickness: 3),
-                          );
-                        });
-                  } else if (snapshot.hasError) {
-                    return Text('${snapshot.error}');
-                  } else {
-                    return const Center(child: Text('No logs found!'));
-                  }
-                }));
+                            ],
+                          ),
+                          // ),
+                        ),
+                        isFirst: false,
+                        indicatorStyle: IndicatorStyle(
+                          width: 40,
+                          color: Colors.green,
+                          padding: const EdgeInsets.all(8),
+                          iconStyle: IconStyle(color: Colors.white, iconData: Icons.check),
+                        ),
+                        beforeLineStyle: const LineStyle(color: Colors.grey, thickness: 1),
+                        afterLineStyle: const LineStyle(color: Colors.grey, thickness: 1),
+                      );
+                    });
+              } else if (snapshot.hasError) {
+                return Text('${snapshot.error}');
+              } else {
+                return Center(
+                    child: Lottie.asset(
+                  "assets/animations/noresult.json",
+                  animate: true,
+                  alignment: Alignment.center,
+                  height: 150,
+                  width: 150,
+                ));
+              }
+            }));
   }
 
   Future<void> _showSignature(BuildContext context, sign) async {

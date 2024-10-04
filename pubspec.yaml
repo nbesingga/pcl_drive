@@ -4,7 +4,7 @@ description: A new Flutter project.
 # Prevent accidental publishing to pub.dev.
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.1
 
 environment:
   sdk: '>=3.0.6 <4.0.0'
@@ -30,6 +30,14 @@ dependencies:
   flutter_signature_pad: ^3.0.1
   connectivity: ^3.0.6
   timeline_tile: ^2.0.0
+  reactive_forms: ^16.1.1
+  flutter_native_splash: ^2.3.7
+  flutter_launcher_icons: ^0.13.1
+  flutter_spinkit: ^5.2.0
+  onesignal_flutter: ^5.1.0
+  navbar_router: ^0.7.3
+  salomon_bottom_bar: ^3.3.2
+  flutter_image_compress: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -46,4 +54,14 @@ flutter:
   assets:
     # Add assets from the images directory to the application.
     - .env
+    - assets/images/logo-dark.png
     - assets/images/
+    - assets/icons/
+    - assets/animations/
+    - assets/images/logo.png
+    - assets/images/2.0x/logo.png
+    - assets/images/3.0x/logo.png
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/logo.png"

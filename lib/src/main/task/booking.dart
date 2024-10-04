@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:js_interop';
 import 'dart:ui' as ui;
 import 'dart:io';
 
@@ -14,6 +13,8 @@ import 'package:multi_image_picker/multi_image_picker.dart';
 import 'package:pcl/src/api/api.dart';
 import 'package:pcl/src/main/task/detail.dart';
 import 'package:pcl/src/main/task/history.dart';
+import 'package:pcl/src/main/task/irregularities.dart';
+import 'package:pcl/src/main/task/pod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart' as path;
 import 'package:flutter_svg/flutter_svg.dart';
@@ -21,6 +22,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:reactive_date_time_picker/reactive_date_time_picker.dart';
 import 'package:reactive_forms/reactive_forms.dart';
 import 'package:connectivity/connectivity.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 
 class BookingPage extends StatefulWidget {
   final item;
@@ -65,7 +67,7 @@ class _BookingPageState extends State<BookingPage> with SingleTickerProviderStat
     if (res.statusCode == 200) {
       var data = jsonDecode(res.body);
       rows = List<dynamic>.from(data['data']);
-      items = rows.map((data) {
+      return rows.map((data) {
         int sequenceNo = data['sequence_no'] ?? 3;
         String nextStatus = '';
         int taskId;
@@ -74,6 +76,12 @@ class _BookingPageState extends State<BookingPage> with SingleTickerProviderStat
         int nextSequenceNo;
         String status = data['status'] ?? 'PAT';
         if (status == 'PAT' || status == 'PRE-ASSIGNED TRUCK') {
+          nextStatus = 'ACCEPT BOOKING';
+          taskId = 3;
+          taskCode = 'APA';
+          nextSequenceNo = 3 + 1;
+          task = 'PICKUP';
+        } else if (status == 'ACPT' || status == 'ACCEPT BOOKING') {
           nextStatus = 'ARRIVE AT PICKUP ADDRESS';
           taskId = 4;
           taskCode = 'APA';
@@ -143,7 +151,6 @@ class _BookingPageState extends State<BookingPage> with SingleTickerProviderStat
           'next_sequence_no': nextSequenceNo
         };
       }).toList();
-      return items;
     } else {
       throw Exception('Failed to load plate no');
     }
@@ -181,11 +188,18 @@ class _BookingPageState extends State<BookingPage> with SingleTickerProviderStat
 
   @override
   void initState() {
-    // booking();
+    booking();
     _simulateLoading();
     _tabController = TabController(length: 2, vsync: this);
     _tabController!.addListener(_handleTabSelection);
     super.initState();
+  }
+
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    setState(() {
+      booking();
+    });
   }
 
   @override
@@ -196,7 +210,7 @@ class _BookingPageState extends State<BookingPage> with SingleTickerProviderStat
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new),
           onPressed: () {
-            Navigator.of(context).pop();
+            Navigator.pop(context, true);
           },
         ),
         title: Text(widget.item['ticket_no'] ?? ''),
@@ -213,7 +227,11 @@ class _BookingPageState extends State<BookingPage> with SingleTickerProviderStat
         future: booking(),
         builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: Colors.orange));
+            return const Center(
+                child: SpinKitFadingCircle(
+              color: Colors.orange,
+              size: 50.0,
+            ));
           } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
             return ListView.builder(
                 padding: const EdgeInsets.all(4),
@@ -270,15 +288,15 @@ class _BookingPageState extends State<BookingPage> with SingleTickerProviderStat
                                                   },
                                                   child: const Icon(
                                                     Icons.work_history,
-                                                    color: Colors.blue,
+                                                    color: Colors.green,
                                                   )),
                                               const SizedBox(width: 10),
                                               GestureDetector(
                                                   onTap: () {
-                                                    // Navigator.push(context, MaterialPageRoute(builder: (context) => ExceptionPage(_pickup_items[index])));
+                                                    Navigator.push(context, MaterialPageRoute(builder: (context) => IrregularityPage(item)));
                                                   },
                                                   child: const Icon(
-                                                    Icons.info,
+                                                    Icons.warning,
                                                     color: Colors.red,
                                                   )),
                                             ],
@@ -298,7 +316,7 @@ class _BookingPageState extends State<BookingPage> with SingleTickerProviderStat
                                         subtitle: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text(item['order_no'], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                            Text(item['order_type'] + " : " + item['order_no'], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red, overflow: TextOverflow.ellipsis)),
                                             Text(
                                               item['booking_date'] ?? '',
                                               style: const TextStyle(fontSize: 11, overflow: TextOverflow.ellipsis),
@@ -329,7 +347,7 @@ class _BookingPageState extends State<BookingPage> with SingleTickerProviderStat
                                       ),
                                       ListTile(
                                           leading: SvgPicture.asset(
-                                            'icons/home_pin.svg',
+                                            'assets/icons/home_pin.svg',
                                             width: 35.0,
                                             height: 35.0,
                                             color: Colors.black,
@@ -354,7 +372,7 @@ class _BookingPageState extends State<BookingPage> with SingleTickerProviderStat
                                           ])),
                                       ListTile(
                                           leading: SvgPicture.asset(
-                                            'icons/home_location.svg',
+                                            'assets/icons/home_location.svg',
                                             width: 35.0,
                                             height: 35.0,
                                             color: Colors.black,
@@ -392,23 +410,211 @@ class _BookingPageState extends State<BookingPage> with SingleTickerProviderStat
                                                             fontWeight: FontWeight.bold,
                                                             color: Colors.red,
                                                           ))))
-                                              : ElevatedButton(
-                                                  style: ElevatedButton.styleFrom(
-                                                      backgroundColor: (item['task'] == 'DELIVERY') ? Colors.green.shade700 : Colors.blue.shade700,
-                                                      minimumSize: const Size.fromHeight(35),
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(20),
-                                                      )),
-                                                  child: FittedBox(
-                                                    fit: BoxFit.scaleDown,
-                                                    child: Row(mainAxisSize: MainAxisSize.max, children: [
-                                                      Text(item['next_status'] ?? ''),
-                                                      const SizedBox(width: 8.0),
-                                                    ]),
-                                                  ),
-                                                  onPressed: () {
-                                                    _showDialog(context, item);
-                                                  }))
+                                              : (item['status'] == 'Assigned' || item['status'] == 'PAT' || item['status'] == 'BTT' || item['status'] == 'ATI')
+                                                  ? Row(
+                                                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                      children: [
+                                                        Expanded(
+                                                            child: ElevatedButton.icon(
+                                                          style: ElevatedButton.styleFrom(
+                                                              backgroundColor: const Color.fromARGB(255, 222, 8, 8),
+                                                              minimumSize: const Size.fromHeight(40),
+                                                              shape: RoundedRectangleBorder(
+                                                                borderRadius: BorderRadius.circular(20),
+                                                              )),
+                                                          onPressed: () {
+                                                            showDialog(
+                                                                context: context,
+                                                                barrierDismissible: false,
+                                                                builder: (BuildContext context) {
+                                                                  String reason = 'Mechanical error/ problem / Vehicle breakdown';
+                                                                  List<String> options = <String>[
+                                                                    "Mechanical error/ problem / Vehicle breakdown",
+                                                                    "Trucker's and Contractor Negligence ( ex. Unreachable via cellphone , Late reporting to duty of trucker, Late provision of trips from the coordinator, Budget related concerns)",
+                                                                    "Expired permits / Peza / Manila ",
+                                                                    "No Available Driver / Helper (due to an Emergency situation that has to attend / Sicked Trucker / Cannot report to work)",
+                                                                    "Coding Scheme",
+                                                                    "Non Peza Registered ",
+                                                                    "No Available truck based on the actual requirement.",
+                                                                    "Not updated registration / Insurance policies",
+                                                                    "With existing trips / Engaged to other customers",
+                                                                    "With current reservations.",
+                                                                  ];
+
+                                                                  return AlertDialog(
+                                                                    title: Text(item['booking_no'] ?? '', textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+                                                                    content: SizedBox(
+                                                                        height: 95,
+                                                                        child: Column(mainAxisAlignment: MainAxisAlignment.start, children: [
+                                                                          const Text("Are you sure to decline this booking?", textAlign: TextAlign.center, style: TextStyle(color: Colors.black)),
+                                                                          const SizedBox(height: 10),
+                                                                          DropdownButtonFormField<String>(
+                                                                            isExpanded: true,
+                                                                            style: const TextStyle(overflow: TextOverflow.clip),
+                                                                            value: reason,
+                                                                            items: options.map((String value) {
+                                                                              return DropdownMenuItem<String>(
+                                                                                value: value,
+                                                                                child: Text(value, style: const TextStyle(overflow: TextOverflow.clip, color: Colors.black)),
+                                                                              );
+                                                                            }).toList(),
+                                                                            onChanged: (String? newValue) {
+                                                                              setState(() {
+                                                                                reason = newValue as String;
+                                                                              });
+                                                                            },
+                                                                            decoration: const InputDecoration(
+                                                                              labelText: 'Reason',
+                                                                              border: OutlineInputBorder(),
+                                                                            ),
+                                                                          ),
+                                                                        ])),
+                                                                    actions: [
+                                                                      FilledButton(
+                                                                        style: ElevatedButton.styleFrom(
+                                                                          backgroundColor: const Color.fromARGB(255, 222, 8, 8),
+                                                                        ),
+                                                                        child: const Text('CANCEL'),
+                                                                        onPressed: () {
+                                                                          Navigator.of(context).pop();
+                                                                        },
+                                                                      ),
+                                                                      FilledButton(
+                                                                        child: const Text('CONFIRM'),
+                                                                        onPressed: isSaving
+                                                                            ? null
+                                                                            : () async {
+                                                                                setState(() {
+                                                                                  Navigator.of(context).pop();
+                                                                                  isSaving = true;
+                                                                                });
+                                                                                await updateStatus({
+                                                                                  ...item,
+                                                                                  'task_code': 'DCLN',
+                                                                                  'next_status': 'DECLINED BOOKING',
+                                                                                  'remarks': reason
+                                                                                });
+                                                                                setState(() {
+                                                                                  isSaving = false;
+                                                                                  booking();
+                                                                                });
+                                                                              },
+                                                                      ),
+                                                                    ],
+                                                                  );
+                                                                });
+                                                          },
+                                                          icon: const Icon(Icons.close),
+                                                          label: const Text('DECLINE'),
+                                                        )),
+                                                        const SizedBox(width: 3),
+                                                        Expanded(
+                                                            child: ElevatedButton.icon(
+                                                          style: ElevatedButton.styleFrom(
+                                                              backgroundColor: Colors.green.shade800,
+                                                              minimumSize: const Size.fromHeight(40),
+                                                              shape: RoundedRectangleBorder(
+                                                                borderRadius: BorderRadius.circular(20),
+                                                              )),
+                                                          onPressed: () {
+                                                            showDialog(
+                                                                context: context,
+                                                                barrierDismissible: false,
+                                                                builder: (BuildContext context) {
+                                                                  return AlertDialog(
+                                                                    title: Text(item['booking_no'], textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+                                                                    content: const Text("Are you sure to accept this booking?", textAlign: TextAlign.center, style: TextStyle(color: Colors.black)),
+                                                                    actions: [
+                                                                      FilledButton(
+                                                                        style: ElevatedButton.styleFrom(
+                                                                          backgroundColor: const Color.fromARGB(255, 222, 8, 8),
+                                                                        ),
+                                                                        child: const Text('CANCEL'),
+                                                                        onPressed: () {
+                                                                          Navigator.of(context).pop();
+                                                                        },
+                                                                      ),
+                                                                      FilledButton(
+                                                                        child: const Text('CONFIRM'),
+                                                                        onPressed: isSaving
+                                                                            ? null
+                                                                            : () async {
+                                                                                setState(() {
+                                                                                  Navigator.of(context).pop();
+                                                                                  isSaving = true;
+                                                                                });
+                                                                                await updateStatus({
+                                                                                  ...item,
+                                                                                  'task_code': 'ACPT',
+                                                                                  'next_status': 'ACCEPT BOOKING'
+                                                                                });
+                                                                                setState(() {
+                                                                                  isSaving = false;
+                                                                                  booking();
+                                                                                });
+                                                                              },
+                                                                      ),
+                                                                    ],
+                                                                  );
+                                                                });
+                                                          },
+                                                          icon: const Icon(Icons.check),
+                                                          label: const Text('ACCEPT'),
+                                                        )),
+                                                      ],
+                                                    )
+                                                  : item['status'] == 'DCLN'
+                                                      ? const Center(
+                                                          child: Text(
+                                                          '*** BOOKING DECLINED ***',
+                                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red),
+                                                        ))
+                                                      : (item['status'] == 'FIU')
+                                                          ? ElevatedButton(
+                                                              style: ElevatedButton.styleFrom(
+                                                                  backgroundColor: (item['task'] == 'DELIVERY') ? Colors.green.shade700 : Colors.blue.shade700,
+                                                                  minimumSize: const Size.fromHeight(35),
+                                                                  shape: RoundedRectangleBorder(
+                                                                    borderRadius: BorderRadius.circular(20),
+                                                                  )),
+                                                              child: FittedBox(
+                                                                fit: BoxFit.scaleDown,
+                                                                child: Row(mainAxisSize: MainAxisSize.max, children: [
+                                                                  Text(item['next_status'] ?? ''),
+                                                                  const SizedBox(width: 8.0),
+                                                                ]),
+                                                              ),
+                                                              onPressed: () {
+                                                                item['inserted_by'] = driver['driver_helper_id'] ?? 0;
+                                                                item['type_by'] = driver['driver_helper_id'] ?? 0;
+                                                                Navigator.push(
+                                                                  context,
+                                                                  MaterialPageRoute(builder: (context) => POD(item)),
+                                                                ).then((podData) {
+                                                                  if (podData != null) {
+                                                                    setState(() {
+                                                                      booking();
+                                                                    });
+                                                                  }
+                                                                });
+                                                              })
+                                                          : ElevatedButton(
+                                                              style: ElevatedButton.styleFrom(
+                                                                  backgroundColor: (item['task'] == 'DELIVERY') ? Colors.green.shade700 : Colors.blue.shade700,
+                                                                  minimumSize: const Size.fromHeight(35),
+                                                                  shape: RoundedRectangleBorder(
+                                                                    borderRadius: BorderRadius.circular(20),
+                                                                  )),
+                                                              child: FittedBox(
+                                                                fit: BoxFit.scaleDown,
+                                                                child: Row(mainAxisSize: MainAxisSize.max, children: [
+                                                                  Text(item['next_status'] ?? ''),
+                                                                  const SizedBox(width: 8.0),
+                                                                ]),
+                                                              ),
+                                                              onPressed: () {
+                                                                _showDialog(context, item);
+                                                              }))
                                     ])),
                               ],
                             ),
@@ -490,174 +696,14 @@ class _BookingPageState extends State<BookingPage> with SingleTickerProviderStat
                                       border: OutlineInputBorder(),
                                       suffixIcon: Icon(Icons.calendar_today),
                                     ),
+                                    datePickerEntryMode: DatePickerEntryMode.inputOnly,
+                                    timePickerEntryMode: TimePickerEntryMode.inputOnly,
                                     selectableDayPredicate: (DateTime date) {
                                       final currentDate = DateTime.now();
                                       final twoDaysBefore = currentDate.subtract(const Duration(days: 2));
                                       return date.isAfter(twoDaysBefore) || date.isAtSameMomentAs(currentDate);
                                     }),
-                                const SizedBox(height: 4.0),
-                                (data['task'] == 'DELIVERY' && data['task_code'] == 'TDD')
-                                    ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                        const SizedBox(height: 8.0),
-                                        const Text('Add Signature', textAlign: TextAlign.start),
-                                        const SizedBox(height: 8.0),
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            border: Border.all(
-                                              color: Colors.grey,
-                                              width: 1.0,
-                                            ),
-                                          ),
-                                          height: 100.0,
-                                          child: Signature(
-                                            key: _signatureKey,
-                                            color: Colors.black,
-                                            strokeWidth: 2.0,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2.0),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                          children: [
-                                            TextButton(
-                                                child: const Text(
-                                                  'Clear Signature',
-                                                  style: TextStyle(color: Colors.red),
-                                                ),
-                                                onPressed: () {
-                                                  _signatureKey.currentState!.clear();
-                                                }),
-                                          ],
-                                        ),
-                                        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                                          const Text('Add Attachment:', textAlign: TextAlign.start),
-                                          // const SizedBox(width: 70.0),
-                                          IconButton(
-                                              icon: SvgPicture.asset(
-                                                'icons/gallery_thumbnail.svg',
-                                                width: 35.0,
-                                                height: 35.0,
-                                                color: Colors.green.shade900,
-                                              ),
-                                              onPressed: () async {
-                                                final image = await _picker.pickImage(source: ImageSource.gallery);
-                                                if (image != null) {
-                                                  final directory = await getApplicationDocumentsDirectory();
-                                                  String imagePath = image.path;
-                                                  String filename = path.basename(imagePath);
-                                                  final tempPath = path.join(directory.path, filename);
-                                                  final imageFile = File(image.path);
-                                                  await imageFile.copy(tempPath);
-
-                                                  final files = {
-                                                    'booking_no': data['booking_no'] ?? '',
-                                                    'batch_no': data['batch_no'] ?? '',
-                                                    'ticket_no': data['ticket_no'] ?? '',
-                                                    'task_code': data['task_code'] ?? '',
-                                                    'attach': filename
-                                                  };
-                                                  setState(() {
-                                                    attach.add(files);
-                                                    selectedImages!.add(File(imagePath));
-                                                  });
-                                                }
-                                              }),
-                                          IconButton(
-                                              onPressed: () async {
-                                                final image = await _picker.pickImage(source: ImageSource.camera);
-                                                if (image != null) {
-                                                  final directory = await getApplicationDocumentsDirectory();
-                                                  var imagePath = File(image.path);
-                                                  String filename = path.basename(image.path);
-                                                  final tempPath = path.join(directory.path, filename);
-                                                  await imagePath.copy(tempPath);
-                                                  final files = {
-                                                    'booking_no': data['booking_no'] ?? '',
-                                                    'batch_no': data['batch_no'] ?? '',
-                                                    'ticket_no': data['ticket_no'] ?? '',
-                                                    'task_code': data['task_code'] ?? '',
-                                                    'attach': filename
-                                                  };
-                                                  setState(() {
-                                                    attach.add(files);
-                                                    selectedImages!.add(imagePath);
-                                                  });
-                                                }
-                                              },
-                                              icon: Icon(Icons.camera_alt, color: Colors.red.shade900),
-                                              iconSize: 28.0),
-                                        ]),
-                                        const SizedBox(height: 8.0),
-                                        selectedImages!.isNotEmpty
-                                            ? SizedBox(
-                                                height: 100,
-                                                child: GridView.builder(
-                                                  shrinkWrap: true,
-                                                  physics: const NeverScrollableScrollPhysics(),
-                                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                                    crossAxisCount: 3,
-                                                    mainAxisSpacing: 8,
-                                                    crossAxisSpacing: 8,
-                                                    childAspectRatio: 1,
-                                                  ),
-                                                  itemCount: selectedImages!.length,
-                                                  itemBuilder: (context, index) {
-                                                    return Stack(
-                                                      children: [
-                                                        Image.file(selectedImages![index], fit: BoxFit.cover, width: 300, height: 300, alignment: Alignment.center),
-                                                        Positioned(
-                                                          top: 0,
-                                                          right: 0,
-                                                          child: Checkbox(
-                                                            value: true,
-                                                            onChanged: (bool? value) {
-                                                              setState(() {
-                                                                if (value == false) {
-                                                                  selectedImages!.removeAt(index);
-                                                                }
-                                                              });
-                                                            },
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    );
-                                                  },
-                                                ),
-                                              )
-                                            : const Align(
-                                                alignment: Alignment.center,
-                                                child: Text(
-                                                  '',
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(color: Colors.red),
-                                                )),
-                                        const SizedBox(height: 8.0),
-                                        TextFormField(
-                                          controller: receiveBy,
-                                          validator: customValidator,
-                                          keyboardType: TextInputType.text,
-                                          decoration: InputDecoration(
-                                            border: const OutlineInputBorder(),
-                                            labelText: 'Received By',
-                                            suffixIcon: receiveBy.text != ''
-                                                ? IconButton(
-                                                    icon: const Icon(Icons.clear),
-                                                    onPressed: () {
-                                                      receiveBy.clear();
-                                                    },
-                                                  )
-                                                : null,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8.0),
-                                        TextFormField(
-                                          controller: note,
-                                          validator: customValidator,
-                                          decoration: const InputDecoration(labelText: 'Remarks', border: OutlineInputBorder()),
-                                        ),
-                                        const SizedBox(height: 16.0)
-                                      ])
-                                    : Container(),
+                                const SizedBox(height: 8.0),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
@@ -676,22 +722,29 @@ class _BookingPageState extends State<BookingPage> with SingleTickerProviderStat
                                       width: 2,
                                     ),
                                     FilledButton.icon(
-                                      icon: const Icon(Icons.save),
-                                      style: ButtonStyle(
-                                        backgroundColor: MaterialStateProperty.all<Color>(Colors.red.shade900),
-                                      ),
-                                      label: const Text('SAVE', overflow: TextOverflow.ellipsis),
-                                      onPressed: () {
-                                        if (_formKey.currentState!.validate() && form.valid) {
-                                          final DateTime date = datetime.value;
-                                          final DateFormat dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
-                                          data['remarks'] = note.text;
-                                          data['receive_by'] = receiveBy.text;
-                                          data['datetime'] = dateFormat.format(date);
-                                          updateStatus(data);
-                                        }
-                                      },
-                                    ),
+                                        icon: const Icon(Icons.update),
+                                        style: ButtonStyle(
+                                          backgroundColor: MaterialStateProperty.all<Color>(Colors.red.shade900),
+                                        ),
+                                        label: const Text('UPDATE', overflow: TextOverflow.ellipsis),
+                                        onPressed: isSaving
+                                            ? null
+                                            : () async {
+                                                if (_formKey.currentState!.validate() && form.valid) {
+                                                  setState(() {
+                                                    isSaving = true;
+                                                  });
+                                                  final DateTime date = datetime.value;
+                                                  final DateFormat dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
+                                                  data['datetime'] = dateFormat.format(date);
+                                                  await updateStatus(data);
+                                                  setState(() {
+                                                    isSaving = false;
+                                                    booking();
+                                                    Navigator.of(context).pop();
+                                                  });
+                                                }
+                                              })
                                   ],
                                 ),
                               ]));
@@ -723,67 +776,32 @@ class _BookingPageState extends State<BookingPage> with SingleTickerProviderStat
   Future<void> updateStatus(data) async {
     DateTime now = DateTime.now();
     final dateTime = DateFormat('yyyy-MM-dd HH:mm:ss').format(now);
-    List<Map<String, dynamic>> logs = [];
-
-    final sign = _signatureKey.currentState;
-    if (sign != null && sign.isNull == false) {
-      final image = await sign.getData();
-      final imageBytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      final directory = await getApplicationDocumentsDirectory();
-      final dateTimex = DateTime.now();
-      final filename = '${dateTimex.microsecondsSinceEpoch}.png';
-      final imagePath = path.join(directory.path, filename);
-      final buffer = imageBytes!.buffer;
-      final file = await File(imagePath).writeAsBytes(buffer.asUint8List(imageBytes.offsetInBytes, imageBytes.lengthInBytes));
-
-      final tempDirectory = await getTemporaryDirectory();
-      final tempPath = path.join(tempDirectory.path, filename);
-      await file.copy(tempPath);
-
-      setState(() {
-        final files = {
-          'booking_no': data['booking_no'] ?? '',
-          'status_code': data['task_code'] ?? '',
-          'attach': filename
-        };
-        attach.add(files);
-      });
-    }
-    // final book = {
-    //   'status': data['task_code'] ?? '',
-    //   'status_name': data['next_status'] ?? '',
-    //   'sequence_no': data['next_sequence_no'] ?? '',
-    //   'task': data[''] ?? ''
-    // };
-    // setState(() {
-    //   // dbHelper.update('booking', book, data['id']);
-    // });
     final task = {
       'status_code': data['task_code'] ?? '',
-      'receive_by': data['receive_by'] ?? '',
+      'receive_by': '',
       'status_date': data['datetime'] ?? dateTime,
       'booking_no': data['booking_no'] ?? '',
       'batch_no': data['batch_no'] ?? '',
-      'remarks': data['note'] ?? '',
-      'inserted_by': driver['id'] ?? 1,
-      'type_by': driver['id'] ?? 1,
       'ticket_no': widget.item['ticket_no'],
+      'remarks': '',
+      'inserted_by': driver['driver_helper_id'] ?? 0,
+      'type_by': driver['driver_helper_id'] ?? 0,
+      'source': 'mobile',
+      'attachment': attach
     };
-    print(task);
     try {
       final result = await api.post(task, 'statusUpdate');
-      print(result);
-      setState(() {
-        if (result.statusCode == 200) {
+      if (result.statusCode == 200) {
+        setState(() {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             backgroundColor: Colors.green,
             content: Text('Status Successfully Updated.'),
-            behavior: SnackBarBehavior.fixed,
+            behavior: SnackBarBehavior.floating,
           ));
-          Navigator.of(context).pop();
-          booking();
-        }
-      });
+        });
+      } else {
+        throw Exception('Failed to update status');
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         backgroundColor: Colors.red,

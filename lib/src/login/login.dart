@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:pcl/src/login/welcome.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// import 'package:package_info/package_info.dart';
+import 'package:package_info/package_info.dart';
 import 'package:pcl/src/api/api.dart';
 import 'package:pcl/src/login/forgot_password.dart';
+import 'package:connectivity/connectivity.dart';
+import 'package:flutter/cupertino.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -22,7 +24,7 @@ class _LoginPageState extends State<LoginPage> {
   FocusNode textFieldFocusNode = FocusNode();
   bool _obscured = true;
   bool _showClearIcon = false;
-  final String _appVersion = '';
+  String _appVersion = '';
   String latestVersion = '';
   String url = '';
   bool _isLoading = false;
@@ -43,11 +45,11 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   app_version() async {
-    // PackageInfo packageInfo = await PackageInfo.fromPlatform();
-    // if (!mounted) return;
-    // setState(() {
-    //   _appVersion = packageInfo.version;
-    // });
+    PackageInfo packageInfo = await PackageInfo.fromPlatform();
+    if (!mounted) return;
+    setState(() {
+      _appVersion = packageInfo.version;
+    });
   }
 
   @override
@@ -80,63 +82,83 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  _login() async {
-    // bool isConnected = await connectivity.isConnected();
-    // if (!isConnected) {
-    //   ConnectivityService.noInternetDialog(context);
-    // } else {
-    setState(() {
-      _isLoading = true;
-    });
-    await Future.delayed(const Duration(seconds: 2));
-    var data = {
-      'username': _usernameController.text,
-      'password': _passwordController.text,
-    };
-    try {
-      await api.postData(data, 'login').then((res) async {
-        if (res != null) {
-          if (res['status'] == true) {
-            SharedPreferences prefs = await SharedPreferences.getInstance();
-            prefs.setString('token', res['data']['api_token']);
-            prefs.setBool('isLoggedIn', true);
-            prefs.setString('user', json.encode(res['data']));
-            // await api.getData('app-version').then((v) async {
-            //   final responseData = json.decode(v.body.toString());
-            //   if (responseData['success'] == true) {
-            //     var data = responseData['data'];
-            //     latestVersion = data['version'];
-            //     url = data['url_link'];
+  void showNoInternetDialog(BuildContext context) {
+    showCupertinoDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return CupertinoAlertDialog(
+          title: Text('No Internet Connection'),
+          content: Text('Please check your internet connection and try again.'),
+          actions: <Widget>[
+            CupertinoDialogAction(
+              child: Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
 
-            setState(() {
-              // if (_appVersion.toString() != latestVersion.toString()) {
-              //   appUpdate(context, url);
-              // } else {
-              _isLoading = false;
-              _usernameController.clear();
-              _passwordController.clear();
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const WelcomePage()));
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                backgroundColor: Colors.green,
-                content: Text(res['message']),
-                behavior: SnackBarBehavior.floating,
-              ));
-              // }
+  _login() async {
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    if (connectivityResult == ConnectivityResult.mobile || connectivityResult == ConnectivityResult.wifi) {
+      setState(() {
+        _isLoading = true;
+      });
+      Future.delayed(const Duration(seconds: 2), () async {
+        var data = {
+          'username': _usernameController.text,
+          'password': _passwordController.text,
+        };
+        try {
+          final response = await api.postData(data, 'login');
+          var res = jsonDecode(response.body);
+          if (response.statusCode == 200) {
+            SharedPreferences preference = await SharedPreferences.getInstance();
+            preference.setString('token', res['data']['api_token']);
+            preference.setBool('isLoggedIn', true);
+            preference.setString('user', json.encode(res['data']));
+            await api.getData('appVersion').then((v) async {
+              final responseData = json.decode(v.body.toString());
+              if (responseData['success'] == true) {
+                var data = responseData['data'];
+                latestVersion = data['version'] ?? '';
+                url = data['link'] ?? '';
+                setState(() {
+                  if (_appVersion.toString() != latestVersion.toString()) {
+                    appUpdate(context, url);
+                  } else {
+                    _isLoading = false;
+                    _usernameController.clear();
+                    _passwordController.clear();
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const WelcomePage()));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      backgroundColor: Colors.green,
+                      content: Text(res['message']),
+                      behavior: SnackBarBehavior.floating,
+                    ));
+                  }
+                });
+              }
             });
-            //   }
-            // });
           } else {
             setState(() {
               _isLoading = false;
-              _showLoginError(res['message']);
+              _showLoginError(res['message'] ?? 'Login Failed');
             });
           }
+        } catch (e) {
+          _isLoading = false;
+          _showLoginError(e.toString());
         }
       });
-    } catch (e) {
-      print('Error during login: $e');
+    } else {
+      showNoInternetDialog(context);
     }
-    // }
   }
 
   Future<void> appUpdate(BuildContext context, url) {
@@ -318,6 +340,11 @@ class _LoginPageState extends State<LoginPage> {
                             label: _isLoading ? CircularProgressIndicator(color: Colors.red.shade900) : const Text('SIGN IN'),
                             icon: const Icon(Icons.login)),
                         const SizedBox(height: 24.0),
+                        Text(
+                          'Version $_appVersion',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        )
                       ],
                     )),
               ),
